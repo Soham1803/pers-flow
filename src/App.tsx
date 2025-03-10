@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Canvas, useThree } from "@react-three/fiber";
+import { Canvas } from "@react-three/fiber";
 import {
   Html,
   OrbitControls,
@@ -7,6 +7,7 @@ import {
   GizmoViewport,
   PivotControls,
   Line,
+  OrthographicCamera,
 } from "@react-three/drei";
 import {
   ReactFlow,
@@ -16,14 +17,12 @@ import {
   Controls,
   Background,
   Panel,
-  Node,
+  // Node,
   Edge,
   NodeProps,
   MarkerType,
   MiniMap,
-  applyNodeChanges,
-  applyEdgeChanges,
-  addEdge,
+
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import * as THREE from "three";
@@ -122,8 +121,8 @@ const Node3D = ({ id, data, position }: Node3DProps) => {
 
       // Update the node position in the flow context
       updateNodePosition(id, {
-        x: position.x * 100,
-        y: -position.y * 100, // Flip Y coordinate for 2D view
+        x: position.x * 100 + 10,
+        y: -position.y * 100 + 10, // Flip Y coordinate for 2D view
       });
     }
   };
@@ -219,8 +218,8 @@ const Node3D = ({ id, data, position }: Node3DProps) => {
 
 // Edge component for 3D with bezier curves
 const Edge3D = ({
-  source,
-  target,
+  // source,
+  // target,
   sourcePosition,
   targetPosition,
 }: Edge3DProps) => {
@@ -232,28 +231,43 @@ const Edge3D = ({
 
   const endPoint = new THREE.Vector3(
     targetPosition.x/50,
-    -targetPosition.y/50,
+    -targetPosition.y/50 + 0.5,
     0.005
   );
 
-  const xAxisDistance = Math.abs(endPoint.x - startPoint.x);
-  const yAxisDistance = Math.abs(endPoint.y - startPoint.y);
+  const firstPivot = new THREE.Vector3(startPoint.x, startPoint.y-0.2, 0.005);
+  const lastPivot = new THREE.Vector3(endPoint.x, endPoint.y+0.8, 0.005);
 
-  const mid = new THREE.Vector3(
-    xAxisDistance > yAxisDistance ? endPoint.x : startPoint.x,
-    xAxisDistance > yAxisDistance ? startPoint.y : endPoint.y,
+
+  const xAxisDistance = lastPivot.x - firstPivot.x;
+  // const yAxisDistance = lastPivot.y - firstPivot.y;
+
+  const mid1 = new THREE.Vector3(
+    xAxisDistance/2,
+    firstPivot.y, 
     0.005
   );
-  
-  // Calculate the angle for arrow head
-  const direction = new THREE.Vector3().subVectors(endPoint, mid).normalize();
-  const angle = Math.atan2(direction.y, direction.x) + Math.PI/2;
+
+  const mid2 = new THREE.Vector3(
+    xAxisDistance/2,
+    lastPivot.y,
+    0.005
+  );
+
+  const points = [
+    startPoint,
+    firstPivot,
+    mid1, 
+    mid2,
+    lastPivot,
+    endPoint
+  ]
   
   return (
     <group>
       {/* Line from drei with consistent width */}
       <Line
-        points={[startPoint, mid, endPoint]}
+        points={points}
         color="#ffffff"
         lineWidth={2}
         dashed={false}
@@ -261,8 +275,8 @@ const Edge3D = ({
 
       {/* Arrow head */}
       <mesh
-        position={[endPoint.x, endPoint.y, 0.005]}
-        rotation={[0, 0, angle]}
+        position={[endPoint.x, endPoint.y+0.02, 0.005]}
+        rotation={[0, 0, Math.PI]}
         scale={0.075}
       >
         <coneGeometry args={[1, 3, 10]} />
@@ -316,23 +330,11 @@ const DualViewFlow = () => {
   ];
 
   // State for both views
-  const [nodes, setNodes] = useNodesState(initialNodes);
-  const [edges, setEdges] = useEdgesState(initialEdges);
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"2d" | "3d">("2d"); // '2d' or '3d'
 
-  const onNodesChange = useCallback(
-    (changes) => setNodes((nds) => applyNodeChanges(changes, nds)),
-    [setNodes]
-  );
-  const onEdgesChange = useCallback(
-    (changes) => setEdges((eds) => applyEdgeChanges(changes, eds)),
-    [setEdges]
-  );
-  const onConnect = useCallback(
-    (connection) => setEdges((eds) => addEdge(connection, eds)),
-    [setEdges]
-  );
 
   // Node types for React Flow
   const nodeTypes = {
@@ -440,7 +442,6 @@ const DualViewFlow = () => {
             edges={edges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
             nodeTypes={nodeTypes}
             onNodeClick={(_, node) => setSelectedNode(node.id)}
             onPaneClick={() => setSelectedNode(null)}
@@ -465,11 +466,11 @@ const DualViewFlow = () => {
           )}
         >
           <Canvas
-            camera={{ position: [0, 0, 15], fov: 60, rotateZ: Math.PI }}
             onCreated={({ gl }) => {
               gl.setClearColor("#111111"); // Set a darker background for better contrast
             }}
           >
+            <OrthographicCamera makeDefault position={[0, 0, 20]} zoom={50} />
             <ambientLight intensity={0.7} />
             <pointLight position={[10, 10, 10]} intensity={1.5} />
 
