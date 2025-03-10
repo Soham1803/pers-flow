@@ -109,20 +109,32 @@ const Node3D = ({ id, data, position }: Node3DProps) => {
   const [optionMenuON, setOptionMenuON] = useState(false);
 
   const groupRef = useRef<THREE.Group>(null);
+  const initialPositionRef = useRef({ x: position.x / 50, y: -position.y / 50, z: 0.005 });
+  const isDraggingRef = useRef(false);
   const { selectedNode, setSelectedNode, updateNodePosition, deleteNode } =
     React.useContext(FlowContext);
 
   // Handle transform changes in 3D environment
   const handleTransformChange = (matrix: THREE.Matrix4) => {
     if (groupRef.current) {
+      if (!isDraggingRef.current) {
+        // First drag - ensure we start from the correct position
+        isDraggingRef.current = true;
+        groupRef.current.position.copy(new THREE.Vector3(
+          initialPositionRef.current.x,
+          initialPositionRef.current.y,
+          initialPositionRef.current.z
+        ));
+      }
+      
       // Extract position from matrix
       const position = new THREE.Vector3();
       position.setFromMatrixPosition(matrix);
-
+      
       // Update the node position in the flow context
       updateNodePosition(id, {
-        x: position.x * 100 + 10,
-        y: -position.y * 100 + 10, // Flip Y coordinate for 2D view
+        x: position.x * 50,
+        y: -position.y * 50,
       });
     }
   };
@@ -136,8 +148,13 @@ const Node3D = ({ id, data, position }: Node3DProps) => {
   // Set initial position when component mounts or position changes
   useEffect(() => {
     if (groupRef.current) {
-      groupRef.current.position.x = position.x / 100;
-      groupRef.current.position.y = -position.y / 100;
+      const x = position.x / 50;
+      const y = -position.y / 50;
+      groupRef.current.position.set(x, y, 0.005);
+      initialPositionRef.current = { x, y, z: 0.005 };
+      
+      // Reset dragging state when position externally changes
+      isDraggingRef.current = false;
     }
   }, [position.x, position.y]);
 
@@ -155,6 +172,11 @@ const Node3D = ({ id, data, position }: Node3DProps) => {
       activeAxes={[true, true, false]} // Only allow movement in X and Y
       disableRotations={true}
       disableSliders={false}
+      matrix={new THREE.Matrix4().setPosition(
+        initialPositionRef.current.x,
+        initialPositionRef.current.y,
+        initialPositionRef.current.z
+      )}
       onDrag={(matrix) => {
         handleTransformChange(matrix);
         setSelectedNode(id);
@@ -172,8 +194,6 @@ const Node3D = ({ id, data, position }: Node3DProps) => {
           <planeGeometry args={[1, 0.5]} />
           <meshStandardMaterial
             color={selectedNode === id ? "#ff8800" : "#2a2a2a"}
-            roughness={0.7}
-            metalness={0.3}
           />
 
           {/* Put Html component as a child of mesh to tightly couple them */}
@@ -224,14 +244,14 @@ const Edge3D = ({
   targetPosition,
 }: Edge3DProps) => {
   const startPoint = new THREE.Vector3(
-    sourcePosition.x / 50,
-    -sourcePosition.y / 50,
+    sourcePosition.x/25,
+    -sourcePosition.y/25,
     0.005
   );
 
   const endPoint = new THREE.Vector3(
-    targetPosition.x/50,
-    -targetPosition.y/50 + 0.5,
+    targetPosition.x/25,
+    -targetPosition.y/25 + 0.5,
     0.005
   );
 
@@ -275,7 +295,7 @@ const Edge3D = ({
 
       {/* Arrow head */}
       <mesh
-        position={[endPoint.x, endPoint.y+0.02, 0.005]}
+        position={[endPoint.x, endPoint.y+0.12, 0.005]}
         rotation={[0, 0, Math.PI]}
         scale={0.075}
       >
@@ -474,6 +494,7 @@ const DualViewFlow = () => {
             <ambientLight intensity={0.7} />
             <pointLight position={[10, 10, 10]} intensity={1.5} />
 
+            <group rotation={[0, 0, 0]}>
             {/* Nodes */}
             {nodes.map((node) => (
               <Node3D
@@ -495,20 +516,21 @@ const DualViewFlow = () => {
                 targetPosition={edge.targetPosition}
               />
             ))}
-
-            {/* Background grid */}
-            {/* <gridHelper args={[20, 20, "#aaa", "#444"]} /> */}
-            {/* <axesHelper args={[10]} /> */}
             <GizmoHelper
               alignment="bottom-right"
               margin={[80, 80]}
               onUpdate={() => console.log("Gizmo updated")}
             >
               <GizmoViewport
-                axisColors={["#ff0000", "#00ff00", "#0000ff"]}
+                axisColors={["#e91e63", "#4caf50", "#2196f3"]}
                 labelColor="#ffffff"
               />
             </GizmoHelper>
+            </group>
+
+            {/* Background grid */}
+            {/* <gridHelper args={[20, 20, "#aaa", "#444"]} /> */}
+            {/* <axesHelper args={[10]} /> */}
 
             {/* Controls */}
             <OrbitControls
