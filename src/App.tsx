@@ -235,7 +235,7 @@ const Edge3D = ({
     0.005
   );
 
-  const firstPivot = new THREE.Vector3(startPoint.x, startPoint.y-0.2, 0.005);
+  const firstPivot = new THREE.Vector3(startPoint.x, startPoint.y-0.8, 0.005);
   const lastPivot = new THREE.Vector3(endPoint.x, endPoint.y+0.8, 0.005);
 
 
